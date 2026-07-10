@@ -1,4 +1,4 @@
-﻿package com.platform.common.page;
+package com.platform.common.page;
 
 import lombok.Data;
 

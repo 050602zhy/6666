@@ -1,4 +1,4 @@
-﻿package com.platform.ai.service.impl;
+package com.platform.ai.service.impl;
 
 import com.platform.ai.service.RecommendService;
 import lombok.extern.slf4j.Slf4j;

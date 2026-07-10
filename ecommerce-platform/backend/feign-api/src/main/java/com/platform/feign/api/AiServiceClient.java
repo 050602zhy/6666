@@ -1,4 +1,4 @@
-﻿package com.platform.feign.api;
+package com.platform.feign.api;
 
 import com.platform.common.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;

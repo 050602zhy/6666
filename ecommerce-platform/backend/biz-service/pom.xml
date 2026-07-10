@@ -37,10 +37,10 @@
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <!-- MyBatis Plus -->
+        <!-- MyBatis Plus (Spring Boot 3.x 专用版本) -->
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
         <!-- OpenFeign -->
         <dependency>
@@ -58,6 +58,11 @@
             <groupId>com.platform</groupId>
             <artifactId>feign-api</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <!-- Knife4j (Swagger增强版) - API接口文档 -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
         </dependency>
     </dependencies>
 

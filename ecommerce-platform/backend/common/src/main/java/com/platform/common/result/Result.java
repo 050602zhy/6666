@@ -61,4 +61,15 @@ public class Result<T> implements Serializable {
     public static <T> Result<T> fail(Integer code, String message) {
         return new Result<>(code, message, null);
     }
+
+    /**
+     * 错误返回（与 fail 等价，兼容不同命名习惯）
+     */
+    public static <T> Result<T> error(String message) {
+        return new Result<>(500, message, null);
+    }
+
+    public static <T> Result<T> error(Integer code, String message) {
+        return new Result<>(code, message, null);
+    }
 }

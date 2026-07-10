@@ -48,6 +48,11 @@
             <artifactId>feign-api</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Knife4j (Swagger增强版) - API接口文档 -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

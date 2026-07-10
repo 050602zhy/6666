@@ -1,4 +1,4 @@
-﻿package com.platform.biz.controller;
+package com.platform.biz.controller;
 
 import com.platform.common.result.Result;
 import com.platform.biz.service.OrderService;

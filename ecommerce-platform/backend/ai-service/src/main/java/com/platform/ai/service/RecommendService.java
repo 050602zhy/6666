@@ -1,4 +1,4 @@
-﻿package com.platform.ai.service;
+package com.platform.ai.service;
 
 /**
  * 智能推荐服务接口
