@@ -15,14 +15,9 @@ DROP TABLE IF EXISTS `user`;
 CREATE TABLE `user` (
     `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '用户ID',
     `username`    VARCHAR(50)  NOT NULL COMMENT '用户名',
-    `password`    VARCHAR(128) NOT NULL COMMENT '密码(MD5加密)',
-    `avatar`      VARCHAR(255) DEFAULT NULL COMMENT '头像路径',
-    `role`        TINYINT      NOT NULL DEFAULT 0 COMMENT '角色: 0-买家 1-卖家',
-    `vip_level`   TINYINT      NOT NULL DEFAULT 0 COMMENT 'VIP等级: 0-普通 1-VIP I 2-VIP II 3-VIP III 4-VIP IV 5-VIP V',
-    `balance`     DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '账户余额',
-    `preference`  VARCHAR(255) DEFAULT NULL COMMENT '购物偏好(逗号分隔的分类)',
-    `personalized_recommend` TINYINT NOT NULL DEFAULT 1 COMMENT '是否开启个性化推荐: 0-关闭 1-开启',
-    `auto_accept_order` TINYINT NOT NULL DEFAULT 0 COMMENT '是否自动接单(卖家): 0-否 1-是',
+    `password`    VARCHAR(128) NOT NULL COMMENT '密码',
+    `nickname`    VARCHAR(50)  DEFAULT NULL COMMENT '昵称',
+    `role`        VARCHAR(20)  NOT NULL DEFAULT 'seller' COMMENT '角色',
     `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0-未删除 1-已删除',
     `create_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -330,3 +325,17 @@ INSERT INTO `category` (`name`, `parent_id`, `sort_order`) VALUES
 ('家居生活', NULL, 4),
 ('图书文具', NULL, 5),
 ('运动户外', NULL, 6);
+
+-- 测试用户
+INSERT INTO `user` (`username`, `password`, `nickname`, `role`, `deleted`) VALUES
+('admin', '123456', '管理员', 'seller', 0);
+
+-- 测试商品数据
+INSERT INTO `product` (`seller_id`, `category_id`, `name`, `description`, `image`, `price`, `stock`, `on_sale`, `rating`, `deleted`) VALUES
+(1, 1, '无线蓝牙耳机', '高音质降噪蓝牙耳机，续航30小时', NULL, 299.00, 150, 1, 4.5, 0),
+(1, 2, '纯棉短袖T恤', '夏季透气舒适纯棉面料，多色可选', NULL, 89.00, 500, 1, 4.2, 0);
+
+-- 测试订单数据
+INSERT INTO `orders` (`order_no`, `product_id`, `product_name`, `product_image`, `quantity`, `unit_price`, `total_amount`, `vip_discount`, `discount_rate`, `buyer_id`, `seller_id`, `status`, `is_rated`, `deleted`) VALUES
+(1001, 1, '无线蓝牙耳机', NULL, 2, 299.00, 598.00, 0.00, NULL, 2, 1, 3, 1, 0),
+(1002, 2, '纯棉短袖T恤', NULL, 3, 89.00, 267.00, 0.00, NULL, 2, 1, 1, 0, 0);

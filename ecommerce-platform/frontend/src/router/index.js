@@ -45,4 +45,14 @@ const router = createRouter({
   routes
 })
 
+// 路由守卫：未登录则跳转到登录页
+router.beforeEach((to, from, next) => {
+  const user = localStorage.getItem('user')
+  if (to.path !== '/login' && !user) {
+    next('/login')
+  } else {
+    next()
+  }
+})
+
 export default router
