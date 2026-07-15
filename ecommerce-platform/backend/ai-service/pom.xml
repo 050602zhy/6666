@@ -53,6 +53,7 @@
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
         </dependency>
+        <!-- Spring AI OpenAI 依赖已移除：项目直接通过 RestTemplate 调用 HTTP API，不使用 Spring AI 自动配置 -->
     </dependencies>
 
     <build>

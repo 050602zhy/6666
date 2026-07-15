@@ -31,6 +31,7 @@
         <lombok.version>1.18.30</lombok.version>
         <!-- Knife4j (Swagger增强版) 版本号 -->
         <knife4j.version>4.4.0</knife4j.version>
+        <spring-ai.version>1.0.0-M7</spring-ai.version>
     </properties>
 
     <!-- 依赖管理 -->
@@ -77,6 +78,14 @@
                 <groupId>com.github.xiaoymin</groupId>
                 <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
                 <version>${knife4j.version}</version>
+            </dependency>
+            <!-- Spring AI BOM -->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

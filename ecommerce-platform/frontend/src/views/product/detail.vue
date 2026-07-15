@@ -59,6 +59,9 @@
               <el-button size="large" @click="handleCancel">
                 取消付款
               </el-button>
+              <el-button type="primary" size="large" plain @click="openAiChat">
+                <el-icon><ChatLineRound /></el-icon> AI咨询
+              </el-button>
             </div>
           </div>
         </div>
@@ -67,8 +70,13 @@
         <div class="comment-section">
           <div class="comment-header">
             <h3>商品评价</h3>
-            <div class="avg-rating">
-              <el-rate :model-value="avgRating" disabled show-score text-color="#ff9900" />
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <el-button type="primary" size="small" plain @click="openAiSummary">
+                <el-icon><TrendCharts /></el-icon> 智能总结
+              </el-button>
+              <div class="avg-rating">
+                <el-rate :model-value="avgRating" disabled show-score text-color="#ff9900" />
+              </div>
             </div>
           </div>
 
@@ -89,6 +97,41 @@
         </div>
       </div>
     </div>
+
+    <!-- AI 咨询弹窗 -->
+    <el-dialog v-model="aiChatVisible" title="AI 智能客服" width="480px" align-center>
+      <div class="ai-chat-box">
+        <div class="ai-chat-history" ref="chatHistoryRef">
+          <div v-for="(msg, idx) in chatMessages" :key="idx" :class="['ai-msg', msg.role]">
+            <div class="ai-msg-content">{{ msg.content }}</div>
+          </div>
+          <div v-if="chatLoading" class="ai-msg ai">
+            <div class="ai-msg-content">
+              <el-icon class="is-loading"><Loading /></el-icon> 思考中...
+            </div>
+          </div>
+        </div>
+        <div class="ai-chat-input">
+          <el-input
+            v-model="chatInput"
+            placeholder="请输入您的问题..."
+            @keyup.enter="sendChat"
+          />
+          <el-button type="primary" :loading="chatLoading" @click="sendChat">发送</el-button>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 智能总结弹窗 -->
+    <el-dialog v-model="aiSummaryVisible" title="评论智能总结" width="480px" align-center>
+      <div v-if="summaryLoading" class="ai-loading">
+        <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+        <p>AI 正在分析评论...</p>
+      </div>
+      <div v-else class="ai-summary-content">
+        <pre>{{ summaryContent }}</pre>
+      </div>
+    </el-dialog>
 
     <!-- 购买确认弹窗 -->
     <el-dialog v-model="buyDialogVisible" title="确认购买" width="420px" align-center>
@@ -117,12 +160,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Picture } from '@element-plus/icons-vue'
+import { ArrowLeft, Picture, ChatLineRound, TrendCharts, Loading } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getProductDetail, buyProduct } from '@/api/product'
 import { getVipConfig } from '@/api/vip'
+import { aiChat, aiAnalyzeComments } from '@/api/ai'
 
 const route = useRoute()
 const router = useRouter()
@@ -132,6 +176,18 @@ const quantity = ref(1)
 const buyDialogVisible = ref(false)
 const comments = ref([])
 const vipConfigList = ref([])
+
+// AI 咨询
+const aiChatVisible = ref(false)
+const chatInput = ref('')
+const chatMessages = ref([])
+const chatLoading = ref(false)
+const chatHistoryRef = ref(null)
+
+// AI 智能总结
+const aiSummaryVisible = ref(false)
+const summaryContent = ref('')
+const summaryLoading = ref(false)
 
 const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
 const buyerId = currentUser.id
@@ -295,6 +351,70 @@ function handleCancel() {
   }).then(() => {
     ElMessage.info('已取消，库存已恢复')
   }).catch(() => {})
+}
+
+/** 打开 AI 咨询弹窗 */
+function openAiChat() {
+  aiChatVisible.value = true
+  if (chatMessages.value.length === 0) {
+    chatMessages.value.push({
+      role: 'ai',
+      content: `亲，您好！我是「${product.value?.name || '该商品'}」的智能客服，有什么可以帮您的吗？`
+    })
+  }
+}
+
+/** 发送咨询消息 */
+async function sendChat() {
+  const question = chatInput.value.trim()
+  if (!question) return
+  chatMessages.value.push({ role: 'user', content: question })
+  chatInput.value = ''
+  chatLoading.value = true
+  await nextTick()
+  if (chatHistoryRef.value) {
+    chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight
+  }
+  try {
+    const res = await aiChat(
+      product.value?.name || '',
+      product.value?.description || '',
+      question
+    )
+    if (res.code === 200) {
+      chatMessages.value.push({ role: 'ai', content: res.data?.content || '抱歉，我没听懂您的问题。' })
+    } else {
+      chatMessages.value.push({ role: 'ai', content: '抱歉，服务暂时不可用，请稍后再试。' })
+    }
+  } catch (e) {
+    chatMessages.value.push({ role: 'ai', content: '网络异常，请检查连接后重试。' })
+  } finally {
+    chatLoading.value = false
+    await nextTick()
+    if (chatHistoryRef.value) {
+      chatHistoryRef.value.scrollTop = chatHistoryRef.value.scrollHeight
+    }
+  }
+}
+
+/** 打开智能总结 */
+async function openAiSummary() {
+  aiSummaryVisible.value = true
+  summaryLoading.value = true
+  summaryContent.value = ''
+  try {
+    const commentTexts = comments.value.map(c => c.content).filter(Boolean)
+    const res = await aiAnalyzeComments(product.value?.name || '', commentTexts)
+    if (res.code === 200) {
+      summaryContent.value = res.data?.content || '暂无分析结果'
+    } else {
+      summaryContent.value = res.message || '分析失败'
+    }
+  } catch (e) {
+    summaryContent.value = '网络异常，请检查连接后重试。'
+  } finally {
+    summaryLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -493,6 +613,76 @@ onMounted(() => {
   font-weight: 700;
   color: #67c23a !important;
   margin-top: 12px;
+}
+
+/* === AI 聊天弹窗样式 === */
+.ai-chat-box {
+  display: flex;
+  flex-direction: column;
+  height: 380px;
+}
+.ai-chat-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+.ai-msg {
+  margin-bottom: 10px;
+  display: flex;
+}
+.ai-msg.user {
+  justify-content: flex-end;
+}
+.ai-msg.ai {
+  justify-content: flex-start;
+}
+.ai-msg-content {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+.ai-msg.user .ai-msg-content {
+  background: #409eff;
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.ai-msg.ai .ai-msg-content {
+  background: #fff;
+  color: #303133;
+  border: 1px solid #e4e7ed;
+  border-bottom-left-radius: 4px;
+}
+.ai-chat-input {
+  display: flex;
+  gap: 8px;
+}
+.ai-chat-input .el-input {
+  flex: 1;
+}
+
+/* === AI 智能总结样式 === */
+.ai-loading {
+  text-align: center;
+  padding: 40px 0;
+  color: #909399;
+}
+.ai-summary-content pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #303133;
+  background: #f5f7fa;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 0;
 }
 
 /* Element Plus 覆盖 */

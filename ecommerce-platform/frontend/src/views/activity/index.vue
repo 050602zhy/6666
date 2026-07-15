@@ -13,8 +13,11 @@
     <div class="content-area">
       <!-- 创建活动表单 -->
       <div class="form-card">
-        <div class="card-header">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
           <span class="card-title">创建活动</span>
+          <el-button type="primary" size="small" plain @click="openAiCopy">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
         </div>
         <el-form :model="activityForm" label-width="100px" label-position="top">
           <el-form-item label="活动名称">
@@ -84,6 +87,32 @@
         </el-form>
       </div>
 
+    <!-- AI 辅助弹窗 -->
+    <el-dialog v-model="aiCopyVisible" title="AI 辅助生成活动方案" width="520px" align-center>
+      <div v-if="aiCopyLoading" class="ai-loading">
+        <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+        <p>AI 正在生成活动方案...</p>
+      </div>
+      <div v-else>
+        <el-form label-position="top">
+          <el-form-item label="描述您的活动需求">
+            <el-input
+              v-model="aiCopyInput"
+              type="textarea"
+              :rows="4"
+              placeholder="例如：夏季清仓活动，面向大学生群体，降价T恤和短裤，希望利润保持20%以上..."
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="generateAiCopy" :loading="aiCopyLoading">生成方案</el-button>
+          </el-form-item>
+        </el-form>
+        <div v-if="aiCopyResult" class="ai-result">
+          <pre>{{ aiCopyResult }}</pre>
+        </div>
+      </div>
+    </el-dialog>
+
       <!-- 活动列表 -->
       <div class="list-card">
         <div class="card-header">
@@ -132,10 +161,11 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ArrowLeft, Plus, Minus } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus, Minus, MagicStick, Loading } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { createActivity, getActivityList, publishActivity, unpublishActivity, deleteActivity } from '@/api/activity'
 import { getMyProductList } from '@/api/product'
+import { aiGenerateCopy } from '@/api/ai'
 
 const loading = ref(false)
 const productList = ref([])
@@ -143,6 +173,42 @@ const activityList = ref([])
 
 const currentUser = JSON.parse(localStorage.getItem('user') || '{}')
 const userId = currentUser.id
+
+// AI 辅助
+const aiCopyVisible = ref(false)
+const aiCopyInput = ref('')
+const aiCopyResult = ref('')
+const aiCopyLoading = ref(false)
+
+/** 打开 AI 辅助弹窗 */
+function openAiCopy() {
+  aiCopyVisible.value = true
+  aiCopyInput.value = ''
+  aiCopyResult.value = ''
+}
+
+/** 生成 AI 活动方案 */
+async function generateAiCopy() {
+  const desc = aiCopyInput.value.trim()
+  if (!desc) {
+    ElMessage.warning('请先描述您的活动需求')
+    return
+  }
+  aiCopyLoading.value = true
+  aiCopyResult.value = ''
+  try {
+    const res = await aiGenerateCopy(desc)
+    if (res.code === 200) {
+      aiCopyResult.value = res.data?.content || '生成失败'
+    } else {
+      aiCopyResult.value = res.message || '生成失败'
+    }
+  } catch (e) {
+    aiCopyResult.value = '网络异常，请检查连接后重试。'
+  } finally {
+    aiCopyLoading.value = false
+  }
+}
 
 const activityForm = reactive({
   name: '',
@@ -444,5 +510,27 @@ onMounted(() => {
 }
 :deep(.el-textarea__inner) {
   background: rgba(255, 255, 255, 0.7);
+}
+
+/* AI 辅助弹窗样式 */
+.ai-loading {
+  text-align: center;
+  padding: 40px 0;
+  color: #909399;
+}
+.ai-result {
+  margin-top: 16px;
+}
+.ai-result pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #303133;
+  background: #f5f7fa;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 0;
 }
 </style>

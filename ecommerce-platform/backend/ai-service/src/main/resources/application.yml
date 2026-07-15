@@ -14,12 +14,18 @@ spring:
         import-check:
           enabled: false
 
+# AI 配置（直接通过 HTTP 调用，不依赖 Spring AI 自动配置）
+ai:
+  api-key: ark-78ed53a1-9a28-4e0f-bf09-eb8b57c6a974-7c884
+  base-url: https://ark.cn-beijing.volces.com/api/v3
+  # 接入点 ID（ep-xxx），创建推理接入点后获取
+  endpoint-id: ep-20260715134001-j27km
+  temperature: 0.7
+
 # SpringDoc OpenAPI 配置 (Knife4j 4.x 基于 SpringDoc)
 springdoc:
   api-docs:
-    # 启用 OpenAPI 文档端点
     enabled: true
-    # 文档端点路径
     path: /v3/api-docs
 
 # Knife4j 增强配置
