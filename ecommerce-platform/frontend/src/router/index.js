@@ -22,7 +22,13 @@ const routes = [
         path: 'product',
         name: 'Product',
         component: () => import('@/views/product/index.vue'),
-        meta: { title: '商品管理' }
+        meta: { title: '商品管理', roles: ['seller'] }
+      },
+      {
+        path: 'product/:id',
+        name: 'ProductDetail',
+        component: () => import('@/views/product/detail.vue'),
+        meta: { title: '商品详情' }
       },
       {
         path: 'order',
@@ -35,6 +41,18 @@ const routes = [
         name: 'Recommend',
         component: () => import('@/views/recommend/index.vue'),
         meta: { title: '智能推荐' }
+      },
+      {
+        path: 'activity',
+        name: 'Activity',
+        component: () => import('@/views/activity/index.vue'),
+        meta: { title: '活动设置', roles: ['seller'] }
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/profile/index.vue'),
+        meta: { title: '个人中心' }
       }
     ]
   }
@@ -45,14 +63,26 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫：未登录则跳转到登录页
+// 路由守卫：未登录则跳转到登录页，有角色限制则校验角色
 router.beforeEach((to, from, next) => {
-  const user = localStorage.getItem('user')
-  if (to.path !== '/login' && !user) {
+  const userStr = localStorage.getItem('user')
+  if (to.path !== '/login' && !userStr) {
     next('/login')
-  } else {
-    next()
+    return
   }
+  // 角色校验
+  if (to.meta.roles && userStr) {
+    try {
+      const user = JSON.parse(userStr)
+      const role = user.role || 'buyer'
+      if (!to.meta.roles.includes(role)) {
+        // 无权限则跳回首页
+        next('/dashboard')
+        return
+      }
+    } catch (e) {}
+  }
+  next()
 })
 
 export default router

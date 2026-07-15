@@ -1,5 +1,6 @@
 package com.platform.biz.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.platform.common.entity.BaseEntity;
 import lombok.Data;
@@ -44,4 +45,16 @@ public class Product extends BaseEntity {
 
     /** 商品评分 */
     private BigDecimal rating;
+
+    /** 折扣率（非数据库字段，来自活动关联） */
+    @TableField(exist = false)
+    private BigDecimal discount;
+
+    /** 折后价格（非数据库字段，来自活动关联） */
+    @TableField(exist = false)
+    private BigDecimal discountPrice;
+
+    /** 原价（非数据库字段，来自活动关联） */
+    @TableField(exist = false)
+    private BigDecimal originalPrice;
 }

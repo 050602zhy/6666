@@ -1,6 +1,6 @@
 <template>
   <div class="product-page">
-    <!-- 顶部栏：返回按钮 + 搜索框 -->
+    <!-- 顶部栏：返回按钮 + 搜索框 + 发布商品按钮 -->
     <div class="top-bar">
       <el-button class="back-btn" @click="$router.push('/dashboard')">
         <el-icon><ArrowLeft /></el-icon>
@@ -17,6 +17,10 @@
           <el-icon><Search /></el-icon>
         </template>
       </el-input>
+      <el-button type="primary" @click="openPublishDialog">
+        <el-icon><Plus /></el-icon>
+        发布商品
+      </el-button>
     </div>
 
     <!-- 商品滚动区域：最多显示3行 -->
@@ -37,20 +41,13 @@
           <div
             class="product-image"
             :style="{ backgroundColor: item.image ? '#fff' : '#1a1a1a' }"
-            @click="handleUploadImage(item)"
+            @click="triggerUpload(item.id)"
           >
             <img v-if="item.image" :src="item.image" alt="商品图片" />
             <div v-else class="image-placeholder">
               <el-icon :size="32"><Plus /></el-icon>
               <span>点击上传图片</span>
             </div>
-            <input
-              ref="fileInput"
-              type="file"
-              accept="image/*"
-              style="display: none"
-              @change="onFileChange"
-            />
           </div>
 
           <!-- 商品信息 -->
@@ -117,24 +114,63 @@
       <!-- 底部滚动提示 -->
       <div v-if="showScrollHint" class="scroll-hint">↓ 向下滚动查看更多 ↓</div>
     </div>
+    <!-- 发布商品弹窗 -->
+    <el-dialog v-model="publishDialogVisible" title="发布商品" width="420px" align-center>
+      <el-form :model="publishForm" label-width="80px">
+        <el-form-item label="商品名称" required>
+          <el-input v-model="publishForm.name" placeholder="请输入商品名称" maxlength="30" show-word-limit />
+        </el-form-item>
+        <el-form-item label="商品描述">
+          <el-input v-model="publishForm.description" type="textarea" :rows="3" placeholder="请输入商品描述" maxlength="100" show-word-limit />
+        </el-form-item>
+        <el-form-item label="商品价格" required>
+          <el-input-number v-model="publishForm.price" :min="0.01" :max="9999.99" :precision="2" :step="1" controls-position="right" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="库存数量" required>
+          <el-input-number v-model="publishForm.stock" :min="0" :max="99999" :step="1" controls-position="right" style="width: 100%" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="publishDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handlePublish">确认发布</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 全局共享的隐藏文件选择器 -->
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept="image/*"
+      style="display: none"
+      @change="onFileChange"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ArrowLeft, Search, Plus, Check, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getProductList, updateProduct, updateProductImage, updateProductOnSale } from '@/api/product'
+import { getMyProductList, updateProduct, updateProductImage, updateProductOnSale, saveProduct } from '@/api/product'
 
 // 商品列表原始数据
 const allProducts = ref([])
 const loading = ref(false)
 const searchKeyword = ref('')
 const scrollRef = ref(null)
-const fileInput = ref(null)
+const fileInputRef = ref(null)
 const showScrollHint = ref(false)
 // 当前上传图片的商品ID
 const currentUploadId = ref(null)
+
+// 发布商品弹窗
+const publishDialogVisible = ref(false)
+const publishForm = reactive({
+  name: '',
+  description: '',
+  price: 10,
+  stock: 100
+})
 
 /**
  * 连续子串匹配搜索
@@ -155,7 +191,7 @@ const filteredProducts = computed(() => {
 async function loadProducts() {
   loading.value = true
   try {
-    const res = await getProductList()
+    const res = await getMyProductList()
     if (res.code === 200) {
       allProducts.value = res.data || []
       await nextTick()
@@ -189,14 +225,11 @@ function handleScroll() {
   if (scrollTop > 30) showScrollHint.value = false
 }
 
-/** 点击图片区域触发文件选择 */
-function handleUploadImage(item) {
-  currentUploadId.value = item.id
-  // 使用同一个 file input，触发点击
-  const inputs = document.querySelectorAll('input[type="file"]')
-  if (inputs.length > 0) {
-    inputs[0].click()
-  }
+/** 点击图片区域，记录商品ID并触发文件选择 */
+function triggerUpload(productId) {
+  currentUploadId.value = productId
+  fileInputRef.value.value = ''
+  fileInputRef.value.click()
 }
 
 /** 文件选择后，转base64上传 */
@@ -267,6 +300,48 @@ async function handleToggleOnSale(item, onSale) {
   }
 }
 
+/** 打开发布商品弹窗 */
+function openPublishDialog() {
+  publishForm.name = ''
+  publishForm.description = ''
+  publishForm.price = 10
+  publishForm.stock = 100
+  publishDialogVisible.value = true
+}
+
+/** 发布商品 */
+async function handlePublish() {
+  if (!publishForm.name.trim()) {
+    ElMessage.warning('请输入商品名称')
+    return
+  }
+  if (publishForm.price <= 0) {
+    ElMessage.warning('商品价格必须大于0')
+    return
+  }
+  if (publishForm.stock < 0) {
+    ElMessage.warning('库存不能为负数')
+    return
+  }
+  try {
+    const res = await saveProduct({
+      name: publishForm.name.trim(),
+      description: publishForm.description.trim(),
+      price: publishForm.price,
+      stock: publishForm.stock
+    })
+    if (res.code === 200) {
+      ElMessage.success('商品发布成功')
+      publishDialogVisible.value = false
+      loadProducts()
+    } else {
+      ElMessage.error(res.message || '发布失败')
+    }
+  } catch (e) {
+    ElMessage.error('发布商品失败')
+  }
+}
+
 onMounted(() => {
   loadProducts()
 })
@@ -277,7 +352,7 @@ onMounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f5f7fa;
+  background: transparent;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -288,7 +363,8 @@ onMounted(() => {
   align-items: center;
   gap: 16px;
   padding: 16px 20px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid #e4e7ed;
   flex-shrink: 0;
 }
@@ -340,7 +416,8 @@ onMounted(() => {
 
 /* === 商品卡片 === */
 .product-card {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid #e4e7ed;
@@ -352,7 +429,7 @@ onMounted(() => {
 
 /* 商品图片区域 */
 .product-image {
-  height: 160px;
+  height: 240px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -448,5 +525,24 @@ onMounted(() => {
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(4px); }
+}
+
+/* Element Plus 组件半透明覆盖 */
+:deep(.el-card) {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 10px;
+}
+:deep(.el-input__wrapper) {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+}
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #c0c4cc inset;
+}
+:deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #409EFF inset;
 }
 </style>

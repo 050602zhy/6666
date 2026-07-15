@@ -1,5 +1,6 @@
 package com.platform.biz.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.platform.common.entity.BaseEntity;
 import lombok.Data;
@@ -66,4 +67,16 @@ public class Order extends BaseEntity {
 
     /** 退款状态: 0-无 1-退款中 2-退款成功 3-退款拒绝 */
     private Integer refundStatus;
+
+    /** 买家用户名（非数据库字段） */
+    @TableField(exist = false)
+    private String buyerName;
+
+    /** 卖家用户名（非数据库字段） */
+    @TableField(exist = false)
+    private String sellerName;
+
+    /** 退款记录ID（非数据库字段，前端处理退款用） */
+    @TableField(exist = false)
+    private Long refundId;
 }

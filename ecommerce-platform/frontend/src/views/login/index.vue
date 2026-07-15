@@ -2,8 +2,7 @@
   <div class="login-page" :style="bgStyle">
     <div class="login-card">
       <h2 class="title">智能电商运营平台</h2>
-      <!-- 登录/注册 Tab 切换 -->
-      <el-tabs v-model="activeTab" class="auth-tabs" @tab-click="clearForm">
+      <el-tabs v-model="activeTab" class="auth-tabs">
         <el-tab-pane label="登录" name="login">
           <el-form ref="loginFormRef" :model="loginForm" :rules="loginRules" @keyup.enter="handleLogin">
             <el-form-item prop="username">
@@ -33,6 +32,12 @@
             <el-form-item prop="confirmPassword">
               <el-input v-model="registerForm.confirmPassword" prefix-icon="Lock" placeholder="请确认密码" type="password" show-password size="large" />
             </el-form-item>
+            <el-form-item prop="role">
+              <el-radio-group v-model="registerForm.role" style="width: 100%">
+                <el-radio-button value="buyer" style="width: 50%">我是买家</el-radio-button>
+                <el-radio-button value="seller" style="width: 50%">我是卖家</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
             <el-form-item>
               <el-button type="success" size="large" :loading="loading" style="width: 100%" @click="handleRegister">
                 注 册
@@ -61,7 +66,7 @@ const registerFormRef = ref(null)
 const bgStyle = { backgroundImage: `url(${oceanBg})` }
 
 const loginForm = reactive({ username: '', password: '' })
-const registerForm = reactive({ username: '', nickname: '', password: '', confirmPassword: '' })
+const registerForm = reactive({ username: '', nickname: '', password: '', confirmPassword: '', role: 'buyer' })
 
 const validateConfirm = (rule, value, callback) => {
   if (value !== registerForm.password) callback(new Error('两次输入的密码不一致'))
@@ -78,6 +83,7 @@ const registerRules = {
     { min: 2, max: 20, message: '用户名长度2-20个字符', trigger: 'blur' }
   ],
   nickname: [{ required: true, message: '请输入昵称', trigger: 'blur' }],
+  role: [{ required: true, message: '请选择角色', trigger: 'change' }],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 4, max: 20, message: '密码长度4-20个字符', trigger: 'blur' }
@@ -86,15 +92,6 @@ const registerRules = {
     { required: true, message: '请确认密码', trigger: 'blur' },
     { validator: validateConfirm, trigger: 'blur' }
   ]
-}
-
-function clearForm() {
-  loginForm.username = ''
-  loginForm.password = ''
-  registerForm.username = ''
-  registerForm.nickname = ''
-  registerForm.password = ''
-  registerForm.confirmPassword = ''
 }
 
 async function handleLogin() {
@@ -108,11 +105,9 @@ async function handleLogin() {
       localStorage.setItem('token', 'mock-token-' + res.data.id)
       ElMessage.success('登录成功')
       router.push('/')
-    } else {
-      ElMessage.error(res.message || '登录失败')
     }
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '登录失败，请检查网络')
+    // request.js 拦截器已统一弹窗
   } finally {
     loading.value = false
   }
@@ -126,18 +121,17 @@ async function handleRegister() {
     const res = await register({
       username: registerForm.username,
       password: registerForm.password,
-      nickname: registerForm.nickname
+      nickname: registerForm.nickname,
+      role: registerForm.role
     })
     if (res.code === 200) {
       ElMessage.success('注册成功，请登录')
       activeTab.value = 'login'
       loginForm.username = registerForm.username
       loginForm.password = ''
-    } else {
-      ElMessage.error(res.message || '注册失败')
     }
   } catch (e) {
-    ElMessage.error(e.response?.data?.message || '注册失败，请检查网络')
+    // request.js 拦截器已统一弹窗
   } finally {
     loading.value = false
   }
@@ -159,7 +153,6 @@ onMounted(() => {
   background-size: cover;
   background-position: center;
 }
-
 .login-card {
   width: 420px;
   padding: 36px 36px 20px;
@@ -168,7 +161,6 @@ onMounted(() => {
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
 }
-
 .title {
   text-align: center;
   font-size: 22px;
@@ -176,7 +168,6 @@ onMounted(() => {
   margin-bottom: 20px;
   font-weight: 700;
 }
-
 .auth-tabs :deep(.el-tabs__header) {
   margin-bottom: 20px;
 }
