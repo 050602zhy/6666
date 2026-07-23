@@ -74,16 +74,15 @@
               />
               <!-- 编辑价格 -->
               <div class="price-row">
-                <el-input-number
-                  v-model="item.price"
-                  :min="0.01"
-                  :max="9999.99"
-                  :precision="2"
-                  :step="1"
+                <el-input
+                  v-model="item.priceStr"
                   size="small"
-                  controls-position="right"
+                  placeholder="输入价格(0.01~9999.99)"
                   @blur="handleUpdatePrice(item)"
-                />
+                  @keyup.enter="$event.target.blur()"
+                >
+                  <template #prepend>¥</template>
+                </el-input>
               </div>
               <!-- 上下架按钮 -->
               <div class="on-sale-row">
@@ -193,7 +192,10 @@ async function loadProducts() {
   try {
     const res = await getMyProductList()
     if (res.code === 200) {
-      allProducts.value = res.data || []
+      allProducts.value = (res.data || []).map(p => ({
+        ...p,
+        priceStr: String(p.price)
+      }))
       await nextTick()
       checkScrollHint()
     }
@@ -276,15 +278,22 @@ async function handleUpdateDesc(item) {
 
 /** 更新商品价格 */
 async function handleUpdatePrice(item) {
-  if (item.price <= 0 || item.price >= 10000) {
+  const price = parseFloat(item.priceStr)
+  if (isNaN(price) || price <= 0 || price >= 10000) {
     ElMessage.warning('商品价格必须在0到10000之间（不含0和10000）')
-    await loadProducts() // 重新加载恢复原值
+    item.priceStr = String(item.price) // 恢复原值
     return
   }
+  if (String(price) !== item.priceStr) {
+    item.priceStr = String(price) // 规范化显示（去掉前导零等）
+  }
   try {
-    await updateProduct({ id: item.id, price: item.price })
+    await updateProduct({ id: item.id, price: price })
+    item.price = price // 同步数值
+    ElMessage.success('价格已更新')
   } catch (e) {
     ElMessage.error('更新价格失败')
+    item.priceStr = String(item.price)
   }
 }
 

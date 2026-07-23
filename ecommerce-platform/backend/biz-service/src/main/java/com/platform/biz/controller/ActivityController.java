@@ -3,12 +3,14 @@ package com.platform.biz.controller;
 import com.platform.biz.annotation.RequireRole;
 import com.platform.biz.dto.ActivityDTO;
 import com.platform.biz.entity.Activity;
+import com.platform.biz.entity.Product;
 import com.platform.biz.service.ActivityService;
 import com.platform.biz.vo.ActivityDetailVO;
 import com.platform.common.result.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,9 +36,11 @@ public class ActivityController {
     }
 
     @GetMapping("/list")
-    @Operation(summary = "活动列表", description = "查询所有活动列表")
-    public Result<List<Activity>> list() {
-        return Result.success(activityService.list());
+    @Operation(summary = "活动列表", description = "查询当前卖家的活动列表")
+    @RequireRole("seller")
+    public Result<List<Activity>> list(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("currentUserId");
+        return Result.success(activityService.list(userId));
     }
 
     @PutMapping("/publish/{id}")
@@ -44,8 +48,10 @@ public class ActivityController {
     @RequireRole("seller")
     public Result<Void> publish(
             @Parameter(description = "活动ID", required = true, example = "1")
-            @PathVariable Long id) {
-        activityService.publish(id);
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("currentUserId");
+        activityService.publish(id, userId);
         return Result.success();
     }
 
@@ -54,8 +60,10 @@ public class ActivityController {
     @RequireRole("seller")
     public Result<Void> unpublish(
             @Parameter(description = "活动ID", required = true, example = "1")
-            @PathVariable Long id) {
-        activityService.unpublish(id);
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("currentUserId");
+        activityService.unpublish(id, userId);
         return Result.success();
     }
 
@@ -64,8 +72,10 @@ public class ActivityController {
     @RequireRole("seller")
     public Result<Void> delete(
             @Parameter(description = "活动ID", required = true, example = "1")
-            @PathVariable Long id) {
-        activityService.delete(id);
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("currentUserId");
+        activityService.delete(id, userId);
         return Result.success();
     }
 
@@ -75,5 +85,11 @@ public class ActivityController {
             @Parameter(description = "活动ID", required = true, example = "1")
             @PathVariable Long id) {
         return Result.success(activityService.getDetail(id));
+    }
+
+    @GetMapping("/active/products")
+    @Operation(summary = "获取进行中活动的商品", description = "获取所有当前进行中（已发布且在有效期内）活动的商品列表")
+    public Result<List<Product>> getActiveActivityProducts() {
+        return Result.success(activityService.listActiveActivityProducts());
     }
 }

@@ -99,7 +99,7 @@
     </div>
 
     <!-- AI 咨询弹窗 -->
-    <el-dialog v-model="aiChatVisible" title="AI 智能客服" width="480px" align-center>
+    <el-dialog v-model="aiChatVisible" title="AI 智能客服" width="480px" align-center class="ai-chat-dialog" :teleported="false">
       <div class="ai-chat-box">
         <div class="ai-chat-history" ref="chatHistoryRef">
           <div v-for="(msg, idx) in chatMessages" :key="idx" :class="['ai-msg', msg.role]">
@@ -123,7 +123,7 @@
     </el-dialog>
 
     <!-- 智能总结弹窗 -->
-    <el-dialog v-model="aiSummaryVisible" title="评论智能总结" width="480px" align-center>
+    <el-dialog v-model="aiSummaryVisible" title="评论智能总结" width="480px" align-center class="ai-summary-dialog" :teleported="false">
       <div v-if="summaryLoading" class="ai-loading">
         <el-icon class="is-loading" :size="32"><Loading /></el-icon>
         <p>AI 正在分析评论...</p>
@@ -379,7 +379,16 @@ async function sendChat() {
     const res = await aiChat(
       product.value?.name || '',
       product.value?.description || '',
-      question
+      question,
+      product.value?.id,
+      JSON.stringify({
+        price: product.value?.price,
+        stock: product.value?.stock,
+        rating: product.value?.rating,
+        discount: product.value?.discount,
+        discountPrice: product.value?.discountPrice,
+        onSale: product.value?.onSale
+      })
     )
     if (res.code === 200) {
       chatMessages.value.push({ role: 'ai', content: res.data?.content || '抱歉，我没听懂您的问题。' })
@@ -615,58 +624,136 @@ onMounted(() => {
   margin-top: 12px;
 }
 
-/* === AI 聊天弹窗样式 === */
+/* === AI 聊天弹窗 — 整体风格统一 === */
+/* 弹窗主体：透明背景 + 圆角，让内部毛玻璃卡片透出 */
+:deep(.ai-chat-dialog) {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 16px;
+  overflow: hidden;
+}
+:deep(.ai-chat-dialog .el-dialog__header) {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 16px 20px;
+  margin: 0;
+}
+:deep(.ai-chat-dialog .el-dialog__title) {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+:deep(.ai-chat-dialog .el-dialog__headerbtn .el-dialog__close) {
+  color: #909399;
+}
+:deep(.ai-chat-dialog .el-dialog__body) {
+  padding: 16px 20px 20px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 .ai-chat-box {
   display: flex;
   flex-direction: column;
   height: 380px;
 }
+
+/* 聊天历史区：毛玻璃卡片 */
 .ai-chat-history {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
   margin-bottom: 12px;
 }
+.ai-chat-history::-webkit-scrollbar { width: 6px; }
+.ai-chat-history::-webkit-scrollbar-track { background: transparent; }
+.ai-chat-history::-webkit-scrollbar-thumb { background: rgba(192, 196, 204, 0.6); border-radius: 3px; }
+
+/* 消息气泡 */
 .ai-msg {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   display: flex;
 }
-.ai-msg.user {
-  justify-content: flex-end;
-}
-.ai-msg.ai {
-  justify-content: flex-start;
-}
+.ai-msg.user { justify-content: flex-end; }
+.ai-msg.ai   { justify-content: flex-start; }
+
 .ai-msg-content {
   max-width: 80%;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: 14px;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
   word-break: break-word;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
+
+/* 用户消息：半透明主题蓝 + 毛玻璃 */
 .ai-msg.user .ai-msg-content {
-  background: #409eff;
+  background: rgba(64, 158, 255, 0.85);
+  backdrop-filter: blur(4px);
   color: #fff;
   border-bottom-right-radius: 4px;
 }
+
+/* AI 消息：半透明白色 + 毛玻璃 */
 .ai-msg.ai .ai-msg-content {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(4px);
   color: #303133;
-  border: 1px solid #e4e7ed;
+  border: 1px solid rgba(255, 255, 255, 0.6);
   border-bottom-left-radius: 4px;
 }
+
+/* 输入区 */
 .ai-chat-input {
   display: flex;
-  gap: 8px;
+  gap: 10px;
+  align-items: center;
 }
 .ai-chat-input .el-input {
   flex: 1;
 }
+.ai-chat-input :deep(.el-input__wrapper) {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(8px);
+  border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+}
 
-/* === AI 智能总结样式 === */
+/* === AI 智能总结弹窗 — 同样风格化 === */
+:deep(.ai-summary-dialog) {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 16px;
+  overflow: hidden;
+}
+:deep(.ai-summary-dialog .el-dialog__header) {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 16px 20px;
+  margin: 0;
+}
+:deep(.ai-summary-dialog .el-dialog__title) {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+:deep(.ai-summary-dialog .el-dialog__body) {
+  padding: 16px 20px 20px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 .ai-loading {
   text-align: center;
   padding: 40px 0;
@@ -679,9 +766,11 @@ onMounted(() => {
   font-size: 14px;
   line-height: 1.8;
   color: #303133;
-  background: #f5f7fa;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   padding: 16px;
-  border-radius: 8px;
+  border-radius: 12px;
   margin: 0;
 }
 

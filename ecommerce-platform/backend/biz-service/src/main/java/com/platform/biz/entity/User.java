@@ -39,8 +39,11 @@ public class User extends BaseEntity {
     @Schema(description = "VIP等级: 0-普通 1~5", example = "0")
     private Integer vipLevel;
 
-    @Schema(description = "购物偏好(逗号分隔的分类ID)")
+    @Schema(description = "购物偏好(商品分类名称)")
     private String preference;
+
+    @Schema(description = "是否开启个性化推荐: 0-否 1-是", example = "1")
+    private Integer personalizedRecommend;
 
     @Schema(description = "是否自动接单: 0-否 1-是", example = "0")
     private Integer autoAcceptOrder;

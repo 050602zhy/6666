@@ -1,0 +1,47 @@
+version: '3.8'
+services:
+  # 业务服务
+  biz-service:
+    build: ./biz-service
+    container_name: ecommerce-biz-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    restart: unless-stopped
+
+  # AI 服务（连接本机Chroma，通过host.docker.internal）
+  ai-service:
+    build: ./ai-service
+    container_name: ecommerce-ai-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      CHROMA_HOST: http://host.docker.internal
+      CHROMA_PORT: 8000
+      AI_API_KEY: ${AI_API_KEY}
+    restart: unless-stopped
+
+  # 网关
+  gateway:
+    build: ./gateway
+    container_name: ecommerce-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      - biz-service
+      - ai-service
+    restart: unless-stopped
+
+  # 前端
+  frontend:
+    build: ./frontend
+    container_name: ecommerce-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway
+    restart: unless-stopped

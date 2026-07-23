@@ -57,4 +57,8 @@ public class Product extends BaseEntity {
     /** 原价（非数据库字段，来自活动关联） */
     @TableField(exist = false)
     private BigDecimal originalPrice;
+
+    /** 卖家名称（非数据库字段，查询时填充） */
+    @TableField(exist = false)
+    private String sellerName;
 }

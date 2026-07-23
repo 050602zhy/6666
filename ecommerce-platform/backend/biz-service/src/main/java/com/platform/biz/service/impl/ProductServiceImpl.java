@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -98,6 +99,7 @@ public class ProductServiceImpl implements ProductService {
         List<Product> products = productMapper.selectList(wrapper);
         for (Product product : products) {
             fillDiscountInfo(product);
+            fillSellerName(product);
         }
         return products;
     }
@@ -120,23 +122,69 @@ public class ProductServiceImpl implements ProductService {
     }
 
     /**
-     * 填充商品折扣信息（查找已发布活动中关联的折扣）
+     * 查找商品当前生效的最佳活动折扣关联（已发布且在有效期内）
+     * 若同一商品关联多个有效活动，取折后价最低（折扣力度最大）的活动
+     *
+     * @param productId 商品ID
+     * @return 最佳 ActivityProduct，无有效活动返回 null
+     */
+    private ActivityProduct findBestActivityProduct(Long productId) {
+        if (productId == null) {
+            return null;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        LambdaQueryWrapper<ActivityProduct> apWrapper = new LambdaQueryWrapper<>();
+        apWrapper.eq(ActivityProduct::getProductId, productId);
+        List<ActivityProduct> aps = activityProductMapper.selectList(apWrapper);
+
+        ActivityProduct bestAp = null;
+        for (ActivityProduct ap : aps) {
+            Activity activity = activityMapper.selectById(ap.getActivityId());
+            if (activity != null && activity.getStatus() != null && activity.getStatus() == 1) {
+                // 时间有效性检查：null 表示不限制
+                boolean timeValid = true;
+                if (activity.getStartTime() != null && activity.getStartTime().isAfter(now)) {
+                    timeValid = false;
+                }
+                if (activity.getEndTime() != null && activity.getEndTime().isBefore(now)) {
+                    timeValid = false;
+                }
+                if (timeValid) {
+                    if (bestAp == null || ap.getDiscountPrice().compareTo(bestAp.getDiscountPrice()) < 0) {
+                        bestAp = ap;
+                    }
+                }
+            }
+        }
+        return bestAp;
+    }
+
+    /**
+     * 填充商品折扣信息（查找已发布且在有效期内的活动关联的折扣）
+     * 若同一商品关联多个有效活动，取折后价最低（折扣力度最大）的活动
      */
     private void fillDiscountInfo(Product product) {
         if (product == null) {
             return;
         }
-        LambdaQueryWrapper<ActivityProduct> apWrapper = new LambdaQueryWrapper<>();
-        apWrapper.eq(ActivityProduct::getProductId, product.getId());
-        List<ActivityProduct> aps = activityProductMapper.selectList(apWrapper);
-        for (ActivityProduct ap : aps) {
-            Activity activity = activityMapper.selectById(ap.getActivityId());
-            if (activity != null && activity.getStatus() != null && activity.getStatus() == 1) {
-                product.setDiscount(ap.getDiscount());
-                product.setDiscountPrice(ap.getDiscountPrice());
-                product.setOriginalPrice(ap.getOriginalPrice());
-                return;
-            }
+        ActivityProduct bestAp = findBestActivityProduct(product.getId());
+        if (bestAp != null) {
+            product.setDiscount(bestAp.getDiscount());
+            // 使用商品当前价格实时计算折后价，避免价格修改后折扣价过期
+            BigDecimal currentPrice = product.getPrice();
+            BigDecimal discountPrice = currentPrice.multiply(bestAp.getDiscount()).setScale(2, RoundingMode.HALF_UP);
+            product.setDiscountPrice(discountPrice);
+            product.setOriginalPrice(currentPrice);
+        }
+    }
+
+    private void fillSellerName(Product product) {
+        if (product == null || product.getSellerId() == null) {
+            return;
+        }
+        User sellerUser = userMapper.selectById(product.getSellerId());
+        if (sellerUser != null) {
+            product.setSellerName(sellerUser.getNickname() != null ? sellerUser.getNickname() : sellerUser.getUsername());
         }
     }
 
@@ -147,6 +195,15 @@ public class ProductServiceImpl implements ProductService {
         if (product == null) {
             throw new BizException("商品不存在");
         }
+
+        // 填充卖家名称（通过sellerId查user表）
+        if (product.getSellerId() != null) {
+            User sellerUser = userMapper.selectById(product.getSellerId());
+            if (sellerUser != null) {
+                product.setSellerName(sellerUser.getNickname() != null ? sellerUser.getNickname() : sellerUser.getUsername());
+            }
+        }
+
         LambdaQueryWrapper<ProductReview> reviewWrapper = new LambdaQueryWrapper<>();
         reviewWrapper.eq(ProductReview::getProductId, id);
         reviewWrapper.orderByDesc(ProductReview::getCreateTime);
@@ -196,18 +253,32 @@ public class ProductServiceImpl implements ProductService {
         stockLock.setCreateTime(LocalDateTime.now());
         stockLockMapper.insert(stockLock);
 
-        // 生成订单号（从1000开始，每单+1）
+        // 生成订单号（从1000开始，每单+1，超过9999重置为1000）
         LambdaQueryWrapper<Order> orderWrapper = new LambdaQueryWrapper<>();
         orderWrapper.orderByDesc(Order::getOrderNo);
         orderWrapper.last("LIMIT 1");
         Order lastOrder = ordersMapper.selectOne(orderWrapper);
         Integer newOrderNo = (lastOrder != null && lastOrder.getOrderNo() != null) ? lastOrder.getOrderNo() + 1 : 1000;
+        // 超过9999则重置为1000，并删除对应旧订单（循环复用）
+        if (newOrderNo > 9999) {
+            newOrderNo = 1000;
+        }
+        // 如果新订单号对应的旧订单存在，先删除旧订单
+        LambdaQueryWrapper<Order> existWrapper = new LambdaQueryWrapper<>();
+        existWrapper.eq(Order::getOrderNo, newOrderNo);
+        Order existOrder = ordersMapper.selectOne(existWrapper);
+        if (existOrder != null) {
+            ordersMapper.deleteById(existOrder.getId());
+            log.info("订单号循环复用，删除旧订单: orderNo={}, orderId={}", newOrderNo, existOrder.getId());
+        }
 
-        // 计算订单金额（含VIP满减）
+        // 计算订单金额（VIP满减优先，再应用活动折扣）
         BigDecimal originalAmount = product.getPrice().multiply(new BigDecimal(quantity));
         BigDecimal vipDiscount = BigDecimal.ZERO;
+        BigDecimal activityDiscountRate = null;
+        Long activityDiscountId = null;
 
-        // 查询买家VIP等级并计算满减
+        // 查询买家VIP等级并计算满减（基于原始总价计算VIP满减）
         User buyer = userMapper.selectById(buyerId);
         if (buyer != null && buyer.getVipLevel() != null && buyer.getVipLevel() > 0) {
             LambdaQueryWrapper<VipConfig> vipWrapper = new LambdaQueryWrapper<>();
@@ -224,7 +295,33 @@ public class ProductServiceImpl implements ProductService {
             }
         }
 
-        BigDecimal totalAmount = originalAmount.subtract(vipDiscount);
+        // 先应用VIP满减
+        BigDecimal afterVipAmount = originalAmount.subtract(vipDiscount);
+        if (afterVipAmount.compareTo(BigDecimal.ZERO) < 0) {
+            afterVipAmount = BigDecimal.ZERO;
+        }
+
+        // 查找商品当前生效的活动折扣，再应用活动折扣（打折）
+        ActivityProduct bestActivity = findBestActivityProduct(productId);
+        if (bestActivity != null && bestActivity.getDiscount() != null
+                && bestActivity.getDiscount().compareTo(BigDecimal.ZERO) > 0
+                && bestActivity.getDiscount().compareTo(BigDecimal.ONE) <= 0) {
+            activityDiscountId = bestActivity.getActivityId();
+            activityDiscountRate = bestActivity.getDiscount();
+        }
+
+        BigDecimal totalAmount;
+        BigDecimal unitPrice;
+        if (activityDiscountRate != null) {
+            // VIP满减后，再打活动折扣
+            totalAmount = afterVipAmount.multiply(activityDiscountRate);
+            // 单价 = 总价 / 数量（反映双重折扣后的实际单价）
+            unitPrice = totalAmount.divide(new BigDecimal(quantity), 2, java.math.RoundingMode.HALF_UP);
+        } else {
+            totalAmount = afterVipAmount;
+            // 单价 = VIP折扣后的总价 / 数量
+            unitPrice = totalAmount.divide(new BigDecimal(quantity), 2, java.math.RoundingMode.HALF_UP);
+        }
         if (totalAmount.compareTo(BigDecimal.ZERO) < 0) {
             totalAmount = BigDecimal.ZERO;
         }
@@ -248,9 +345,11 @@ public class ProductServiceImpl implements ProductService {
         order.setProductName(product.getName());
         order.setProductImage(product.getImage());
         order.setQuantity(quantity);
-        order.setUnitPrice(product.getPrice());
+        order.setUnitPrice(unitPrice);
         order.setTotalAmount(totalAmount);
         order.setVipDiscount(vipDiscount);
+        order.setActivityDiscountId(activityDiscountId);
+        order.setDiscountRate(activityDiscountRate);
         order.setBuyerId(buyerId);
         order.setSellerId(product.getSellerId());
         order.setStatus(1); // 已付款待发货

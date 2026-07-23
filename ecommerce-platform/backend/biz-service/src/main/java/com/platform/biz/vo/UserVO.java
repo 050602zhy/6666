@@ -36,6 +36,9 @@ public class UserVO {
     @Schema(description = "购物偏好")
     private String preference;
 
+    @Schema(description = "是否开启个性化推荐: 0-否 1-是", example = "1")
+    private Integer personalizedRecommend;
+
     @Schema(description = "是否自动接单: 0-否 1-是", example = "0")
     private Integer autoAcceptOrder;
 

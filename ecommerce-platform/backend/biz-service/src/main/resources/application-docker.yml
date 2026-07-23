@@ -1,0 +1,42 @@
+# biz-service Docker环境配置
+server:
+  port: 8082
+
+spring:
+  application:
+    name: biz-service
+  cloud:
+    nacos:
+      discovery:
+        enabled: true
+        server-addr: host.docker.internal:8848
+      config:
+        server-addr: host.docker.internal:8848
+        file-extension: yml
+        import-check:
+          enabled: false
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://host.docker.internal:3306/ecommerce_platform?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 050602zhy
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+knife4j:
+  enable: true
+  setting:
+    swagger-model-name: 业务服务模型
+    enable-swagger-models: true
+    enable-tag-groups: true
+
+logging:
+  level:
+    com.platform.biz: info

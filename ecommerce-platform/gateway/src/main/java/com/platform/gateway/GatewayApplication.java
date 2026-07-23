@@ -1,4 +1,4 @@
-﻿package com.platform.gateway;
+package com.platform.gateway;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

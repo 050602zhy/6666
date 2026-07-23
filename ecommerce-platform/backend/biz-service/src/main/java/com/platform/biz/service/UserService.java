@@ -65,4 +65,12 @@ public interface UserService {
      * @param autoAcceptOrder  自动接单状态: 0-否 1-是
      */
     void updateAutoAccept(Long id, Integer autoAcceptOrder);
+
+    /**
+     * 切换个性化推荐状态
+     *
+     * @param id                     用户ID
+     * @param personalizedRecommend  个性化推荐状态: 0-否 1-是
+     */
+    void updatePersonalizedRecommend(Long id, Integer personalizedRecommend);
 }

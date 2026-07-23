@@ -77,6 +77,12 @@ public class ProductController {
         return Result.success(productService.onSaleList());
     }
 
+    @GetMapping("/onSale/list")
+    @Operation(summary = "获取所有上架商品", description = "获取所有上架商品列表（含活动折扣信息）")
+    public Result<List<Product>> onSaleProductList() {
+        return Result.success(productService.onSaleList());
+    }
+
     @PostMapping("/save")
     @Operation(summary = "发布商品", description = "卖家发布新商品")
     @RequireRole("seller")

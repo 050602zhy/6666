@@ -8,11 +8,40 @@ spring:
     nacos:
       discovery:
         server-addr: 127.0.0.1:8848
+        heart-beat-interval: 5000
+        heart-beat-timeout: 15000
+        ip-delete-timeout: 30000
       config:
         server-addr: 127.0.0.1:8848
         file-extension: yml
         import-check:
           enabled: false
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/ecommerce?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: 050602zhy
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 100MB
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+      id-type: auto
+
+# Chroma 向量数据库配置
+chroma:
+  host: http://127.0.0.1
+  port: 8000
+  collection-prefix: ecommerce_kb_
 
 # AI 配置（直接通过 HTTP 调用，不依赖 Spring AI 自动配置）
 ai:

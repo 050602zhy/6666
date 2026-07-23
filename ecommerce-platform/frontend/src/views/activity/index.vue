@@ -88,7 +88,7 @@
       </div>
 
     <!-- AI 辅助弹窗 -->
-    <el-dialog v-model="aiCopyVisible" title="AI 辅助生成活动方案" width="520px" align-center>
+    <el-dialog v-model="aiCopyVisible" title="AI 辅助生成活动方案" width="560px" align-center>
       <div v-if="aiCopyLoading" class="ai-loading">
         <el-icon class="is-loading" :size="32"><Loading /></el-icon>
         <p>AI 正在生成活动方案...</p>
@@ -107,8 +107,72 @@
             <el-button type="primary" @click="generateAiCopy" :loading="aiCopyLoading">生成方案</el-button>
           </el-form-item>
         </el-form>
+
+        <!-- 结构化展示区 -->
         <div v-if="aiCopyResult" class="ai-result">
-          <pre>{{ aiCopyResult }}</pre>
+          <!-- 活动名称 -->
+          <div class="result-section">
+            <div class="result-section-header">
+              <span class="section-title">活动名称</span>
+              <el-tag size="small" type="success" effect="plain" v-if="aiCopyResult.name">已生成</el-tag>
+            </div>
+            <div class="result-content name-content" v-if="aiCopyResult.name">
+              {{ aiCopyResult.name }}
+            </div>
+            <div class="result-empty" v-else>
+              未识别到活动名称
+            </div>
+          </div>
+
+          <!-- 活动描述 -->
+          <div class="result-section">
+            <div class="result-section-header">
+              <span class="section-title">活动描述</span>
+              <el-tag size="small" type="success" effect="plain" v-if="aiCopyResult.description">已生成</el-tag>
+            </div>
+            <div class="result-content desc-content" v-if="aiCopyResult.description">
+              {{ aiCopyResult.description }}
+            </div>
+            <div class="result-empty" v-else>
+              未识别到活动描述
+            </div>
+          </div>
+
+          <!-- 改进建议 -->
+          <div class="result-section">
+            <div class="result-section-header">
+              <span class="section-title">改进建议</span>
+              <el-tag size="small" type="warning" effect="plain" v-if="aiCopyResult.suggestions && aiCopyResult.suggestions.length">
+                {{ aiCopyResult.suggestions.length }} 条
+              </el-tag>
+            </div>
+            <div v-if="aiCopyResult.suggestions && aiCopyResult.suggestions.length" class="suggestions-list">
+              <div v-for="(sug, idx) in aiCopyResult.suggestions" :key="idx" class="suggestion-item">
+                <span class="suggestion-index">{{ idx + 1 }}</span>
+                <span class="suggestion-text">{{ sug }}</span>
+              </div>
+            </div>
+            <div class="result-empty" v-else>
+              暂无建议
+            </div>
+          </div>
+
+          <!-- 操作按钮区 -->
+          <div class="ai-result-actions">
+            <el-button type="primary" @click="applyToForm" :disabled="!canApplyToForm">
+              <el-icon><Check /></el-icon>
+              应用到表单
+            </el-button>
+            <el-button @click="toggleRawContent">
+              {{ showRawContent ? '隐藏原始内容' : '查看原始内容' }}
+            </el-button>
+          </div>
+
+          <!-- 原始内容（可折叠） -->
+          <div v-if="showRawContent && aiCopyResult.rawContent" class="raw-content">
+            <div class="raw-title">原始 AI 回复</div>
+            <pre>{{ aiCopyResult.rawContent }}</pre>
+          </div>
         </div>
       </div>
     </el-dialog>
@@ -160,8 +224,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { ArrowLeft, Plus, Minus, MagicStick, Loading } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ArrowLeft, Plus, Minus, MagicStick, Loading, Check } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { createActivity, getActivityList, publishActivity, unpublishActivity, deleteActivity } from '@/api/activity'
 import { getMyProductList } from '@/api/product'
@@ -177,14 +241,21 @@ const userId = currentUser.id
 // AI 辅助
 const aiCopyVisible = ref(false)
 const aiCopyInput = ref('')
-const aiCopyResult = ref('')
+const aiCopyResult = ref(null)
 const aiCopyLoading = ref(false)
+const showRawContent = ref(false)
+
+/** 是否可以应用到表单（名称和描述至少有一个已生成） */
+const canApplyToForm = computed(() => {
+  return !!(aiCopyResult.value && (aiCopyResult.value.name || aiCopyResult.value.description))
+})
 
 /** 打开 AI 辅助弹窗 */
 function openAiCopy() {
   aiCopyVisible.value = true
   aiCopyInput.value = ''
-  aiCopyResult.value = ''
+  aiCopyResult.value = null
+  showRawContent.value = false
 }
 
 /** 生成 AI 活动方案 */
@@ -195,19 +266,57 @@ async function generateAiCopy() {
     return
   }
   aiCopyLoading.value = true
-  aiCopyResult.value = ''
+  aiCopyResult.value = null
   try {
     const res = await aiGenerateCopy(desc)
-    if (res.code === 200) {
-      aiCopyResult.value = res.data?.content || '生成失败'
+    if (res.code === 200 && res.data) {
+      aiCopyResult.value = res.data
     } else {
-      aiCopyResult.value = res.message || '生成失败'
+      // 兼容旧版返回，构造一个默认对象
+      aiCopyResult.value = {
+        name: '',
+        description: '',
+        suggestions: [],
+        rawContent: res.message || '生成失败',
+        simulated: false
+      }
     }
   } catch (e) {
-    aiCopyResult.value = '网络异常，请检查连接后重试。'
+    aiCopyResult.value = {
+      name: '',
+      description: '',
+      suggestions: [],
+      rawContent: '网络异常，请检查连接后重试。',
+      simulated: false
+    }
   } finally {
     aiCopyLoading.value = false
   }
+}
+
+/** 将 AI 生成结果应用到活动表单 */
+function applyToForm() {
+  if (!aiCopyResult.value) return
+  let applied = false
+  if (aiCopyResult.value.name) {
+    activityForm.name = aiCopyResult.value.name
+    applied = true
+  }
+  if (aiCopyResult.value.description) {
+    activityForm.description = aiCopyResult.value.description
+    applied = true
+  }
+  if (applied) {
+    ElMessage.success('已应用到活动表单')
+    aiCopyVisible.value = false
+  } else {
+    ElMessage.warning('没有可应用的内容')
+  }
+}
+
+/** 切换显示原始内容 */
+function toggleRawContent() {
+  showRawContent.value = !showRawContent.value
 }
 
 const activityForm = reactive({
@@ -521,16 +630,105 @@ onMounted(() => {
 .ai-result {
   margin-top: 16px;
 }
-.ai-result pre {
+
+/* 结构化结果区块 */
+.result-section {
+  margin-bottom: 16px;
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+.result-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #606266;
+}
+.result-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #303133;
+}
+.name-content {
+  font-size: 16px;
+  font-weight: 600;
+  color: #409eff;
+}
+.desc-content {
+  color: #606266;
+}
+.result-empty {
+  font-size: 13px;
+  color: #c0c4cc;
+  font-style: italic;
+}
+
+/* 建议列表 */
+.suggestions-list {
+  margin-top: 4px;
+}
+.suggestion-item {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #e4e7ed;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #606266;
+}
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+.suggestion-index {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  text-align: center;
+  background: #e6a23c;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+}
+.suggestion-text {
+  flex: 1;
+}
+
+/* 操作按钮区 */
+.ai-result-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+}
+
+/* 原始内容 */
+.raw-content {
+  margin-top: 16px;
+}
+.raw-title {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+.raw-content pre {
   white-space: pre-wrap;
   word-break: break-word;
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.8;
-  color: #303133;
-  background: #f5f7fa;
-  padding: 16px;
-  border-radius: 8px;
+  color: #909399;
+  background: #fafafa;
+  padding: 12px;
+  border-radius: 6px;
   margin: 0;
+  border: 1px solid #ebeef5;
 }
 </style>

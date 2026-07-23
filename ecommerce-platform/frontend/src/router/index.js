@@ -49,6 +49,12 @@ const routes = [
         meta: { title: '活动设置', roles: ['seller'] }
       },
       {
+        path: 'knowledge',
+        name: 'Knowledge',
+        component: () => import('@/views/knowledge/index.vue'),
+        meta: { title: '知识库管理', roles: ['seller'] }
+      },
+      {
         path: 'profile',
         name: 'Profile',
         component: () => import('@/views/profile/index.vue'),

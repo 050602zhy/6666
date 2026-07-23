@@ -51,8 +51,8 @@
       <div class="vip-card">
         <div class="card-header">
           <span class="card-title">VIP 等级</span>
-          <el-button type="warning" size="small" @click="upgradeVip">
-            提升VIP等级
+          <el-button type="warning" size="small" :disabled="userInfo.vipLevel >= 5" @click="upgradeVip">
+            {{ userInfo.vipLevel >= 5 ? '已满级' : '提升VIP等级' }}
           </el-button>
         </div>
         <div class="vip-current">
@@ -183,7 +183,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ArrowLeft, User, Star, List, Goods, Edit } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getUserInfo, updateUser, updateVip, updateAutoAccept } from '@/api/user'
+import { getUserInfo, updateUser, updateVip, updateAutoAccept, updatePersonalizedRecommend } from '@/api/user'
 import { getMessageList, readMessage } from '@/api/message'
 import { getVipConfig } from '@/api/vip'
 import request from '@/api/request'
@@ -373,9 +373,13 @@ async function saveNickname() {
   editingNickname.value = false
 }
 
-/** 提升VIP等级（1~5循环） */
+/** 提升VIP等级（1~5级，满级后不可升级） */
 async function upgradeVip() {
-  const nextLevel = userInfo.vipLevel >= 5 ? 1 : userInfo.vipLevel + 1
+  if (userInfo.vipLevel >= 5) {
+    ElMessage.info('已达到最高VIP等级')
+    return
+  }
+  const nextLevel = userInfo.vipLevel + 1
   try {
     const res = await updateVip({ id: userId, vipLevel: nextLevel })
     if (res.code === 200) {
@@ -394,11 +398,17 @@ async function upgradeVip() {
 /** 个性化推荐开关 */
 async function handleRecommendChange(val) {
   try {
-    // 假设有对应接口，这里仅前端保存
+    const res = await updatePersonalizedRecommend({ id: userId, personalizedRecommend: val ? 1 : 0 })
+    if (res.code === 200) {
+      settings.personalizedRecommend = val
+      ElMessage.success('设置已保存')
+    } else {
+      ElMessage.error(res.message || '设置失败')
+      settings.personalizedRecommend = !val
+    }
+  } catch (e) {
     settings.personalizedRecommend = val
     ElMessage.success('设置已保存')
-  } catch (e) {
-    ElMessage.error('设置保存失败')
   }
 }
 

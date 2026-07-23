@@ -1,0 +1,123 @@
+version: "3.8"
+
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: ecommerce-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: 050602zhy
+      MYSQL_DATABASE: ecommerce_platform
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - ecommerce-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Nacos 注册中心
+  nacos:
+    image: nacos/nacos-server:v2.3.0
+    container_name: ecommerce-nacos
+    environment:
+      MODE: standalone
+      SPRING_DATASOURCE_PLATFORM: mysql
+      MYSQL_SERVICE_HOST: mysql
+      MYSQL_SERVICE_DB_NAME: nacos
+      MYSQL_SERVICE_PORT: 3306
+      MYSQL_SERVICE_USER: root
+      MYSQL_SERVICE_PASSWORD: 050602zhy
+      NACOS_AUTH_ENABLE: "true"
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - ecommerce-net
+
+  # ChromaDB 向量数据库
+  chroma:
+    image: chromadb/chroma:0.5.5
+    container_name: ecommerce-chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - ecommerce-net
+
+  # API 网关
+  gateway:
+    build: ./gateway
+    container_name: ecommerce-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - NACOS_SERVER_ADDR=nacos:8848
+    depends_on:
+      - nacos
+    networks:
+      - ecommerce-net
+
+  # 业务服务
+  biz-service:
+    build: ./backend/biz-service
+    container_name: ecommerce-biz
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - NACOS_SERVER_ADDR=nacos:8848
+      - MYSQL_HOST=mysql
+    depends_on:
+      - mysql
+      - nacos
+    networks:
+      - ecommerce-net
+
+  # AI 服务
+  ai-service:
+    build: ./backend/ai-service
+    container_name: ecommerce-ai
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - NACOS_SERVER_ADDR=nacos:8848
+      - MYSQL_HOST=mysql
+      - CHROMA_HOST=http://chroma
+      - CHROMA_PORT=8000
+    depends_on:
+      - mysql
+      - nacos
+      - chroma
+    networks:
+      - ecommerce-net
+
+  # 前端
+  frontend:
+    build: ./frontend
+    container_name: ecommerce-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway
+    networks:
+      - ecommerce-net
+
+volumes:
+  mysql_data:
+  chroma_data:
+
+networks:
+  ecommerce-net:
+    driver: bridge

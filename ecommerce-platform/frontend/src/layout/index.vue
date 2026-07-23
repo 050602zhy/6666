@@ -25,6 +25,9 @@
         <el-menu-item v-if="userRole === 'seller'" index="/activity" title="活动设置">
           <el-icon :size="20"><Present /></el-icon>
         </el-menu-item>
+        <el-menu-item v-if="userRole === 'seller'" index="/knowledge" title="知识库管理">
+          <el-icon :size="20"><Collection /></el-icon>
+        </el-menu-item>
         <el-menu-item v-if="userRole === 'buyer'" index="/recommend" title="智能推荐">
           <el-icon :size="20"><MagicStick /></el-icon>
         </el-menu-item>
@@ -79,7 +82,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Shop, DataAnalysis, Goods, List, Present, MagicStick, User, Bell } from '@element-plus/icons-vue'
+import { Search, Shop, DataAnalysis, Goods, List, Present, MagicStick, User, Bell, Collection } from '@element-plus/icons-vue'
 import { getOnSaleList } from '@/api/product'
 
 const router = useRouter()

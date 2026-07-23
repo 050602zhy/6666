@@ -125,6 +125,19 @@ public class UserServiceImpl implements UserService {
         userMapper.updateById(update);
     }
 
+    @Override
+    public void updatePersonalizedRecommend(Long id, Integer personalizedRecommend) {
+        log.info("切换个性化推荐: id={}, personalizedRecommend={}", id, personalizedRecommend);
+        User user = userMapper.selectById(id);
+        if (user == null) {
+            throw new BizException("用户不存在");
+        }
+        User update = new User();
+        update.setId(id);
+        update.setPersonalizedRecommend(personalizedRecommend);
+        userMapper.updateById(update);
+    }
+
     /**
      * User 转 UserVO
      */
@@ -138,6 +151,7 @@ public class UserServiceImpl implements UserService {
         vo.setBalance(user.getBalance());
         vo.setVipLevel(user.getVipLevel());
         vo.setPreference(user.getPreference());
+        vo.setPersonalizedRecommend(user.getPersonalizedRecommend());
         vo.setAutoAcceptOrder(user.getAutoAcceptOrder());
         vo.setCreateTime(user.getCreateTime());
         return vo;

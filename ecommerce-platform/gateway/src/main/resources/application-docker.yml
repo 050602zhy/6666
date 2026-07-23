@@ -1,0 +1,38 @@
+# gateway Docker环境配置
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gateway
+  cloud:
+    nacos:
+      discovery:
+        server-addr: host.docker.internal:8848
+      config:
+        server-addr: host.docker.internal:8848
+        file-extension: yml
+        import-check:
+          enabled: false
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: ai-service
+          uri: lb://ai-service
+          predicates:
+            - Path=/ai/**
+          filters:
+            - StripPrefix=0
+        - id: biz-service
+          uri: lb://biz-service
+          predicates:
+            - Path=/biz/**
+          filters:
+            - StripPrefix=0
+
+logging:
+  level:
+    com.platform.gateway: info

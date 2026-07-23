@@ -34,3 +34,8 @@ export function updateVip(data) {
 export function updateAutoAccept(data) {
   return request.put('/biz/user/autoAccept', data)
 }
+
+/** 更新个性化推荐设置 */
+export function updatePersonalizedRecommend(data) {
+  return request.put('/biz/user/personalizedRecommend', data)
+}

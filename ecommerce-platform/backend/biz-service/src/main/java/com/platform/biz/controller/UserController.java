@@ -48,6 +48,14 @@ public class UserController {
         return Result.success(userService.getUserInfo(id));
     }
 
+    @GetMapping("/{id}")
+    @Operation(summary = "根据ID查询用户", description = "根据用户ID获取用户完整信息（偏好、个性化推荐设置等）")
+    public Result<UserVO> getUserById(
+            @Parameter(description = "用户ID", required = true, example = "1")
+            @PathVariable Long id) {
+        return Result.success(userService.getUserInfo(id));
+    }
+
     @PutMapping
     @Operation(summary = "更新用户信息", description = "更新用户昵称、头像等信息")
     public Result<Void> updateUser(@RequestBody User user) {
@@ -79,6 +87,15 @@ public class UserController {
         Long id = Long.valueOf(body.get("id").toString());
         Integer autoAcceptOrder = Integer.valueOf(body.get("autoAcceptOrder").toString());
         userService.updateAutoAccept(id, autoAcceptOrder);
+        return Result.success();
+    }
+
+    @PutMapping("/personalizedRecommend")
+    @Operation(summary = "切换个性化推荐", description = "设置用户是否开启个性化推荐")
+    public Result<Void> updatePersonalizedRecommend(@RequestBody Map<String, Object> body) {
+        Long id = Long.valueOf(body.get("id").toString());
+        Integer personalizedRecommend = Integer.valueOf(body.get("personalizedRecommend").toString());
+        userService.updatePersonalizedRecommend(id, personalizedRecommend);
         return Result.success();
     }
 }

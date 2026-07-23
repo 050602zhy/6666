@@ -135,10 +135,11 @@ public class OrderServiceImpl implements OrderService {
         updateSeller.setBalance(seller.getBalance().add(order.getTotalAmount()));
         userMapper.updateById(updateSeller);
 
-        // 更新订单状态为已发货
+        // 更新订单状态为已发货，并设置评价过期时间（24小时后）
         Order updateOrder = new Order();
         updateOrder.setId(orderId);
         updateOrder.setStatus(2);
+        updateOrder.setRateExpireTime(LocalDateTime.now().plusHours(24));
         ordersMapper.updateById(updateOrder);
 
         // 通知买家：卖家已发货
@@ -299,6 +300,10 @@ public class OrderServiceImpl implements OrderService {
         if (rating == null || rating < 1 || rating > 5) {
             throw new BizException("评分必须在1~5之间");
         }
+        // 检查评价是否已过期
+        if (order.getRateExpireTime() != null && LocalDateTime.now().isAfter(order.getRateExpireTime())) {
+            throw new BizException("评价已过期，订单完成后24小时内可评价");
+        }
 
         // 创建评论
         ProductReview review = new ProductReview();
@@ -315,7 +320,7 @@ public class OrderServiceImpl implements OrderService {
         updateOrder.setIsRated(1);
         ordersMapper.updateById(updateOrder);
 
-        // 更新商品评分（平均分）
+        // 更新商品评分（平均分，小数截断取整）
         LambdaQueryWrapper<ProductReview> reviewWrapper = new LambdaQueryWrapper<>();
         reviewWrapper.eq(ProductReview::getProductId, order.getProductId());
         List<ProductReview> reviews = productReviewMapper.selectList(reviewWrapper);
@@ -323,7 +328,7 @@ public class OrderServiceImpl implements OrderService {
             BigDecimal avgRating = reviews.stream()
                     .map(r -> new BigDecimal(r.getRating()))
                     .reduce(BigDecimal.ZERO, BigDecimal::add)
-                    .divide(new BigDecimal(reviews.size()), 2, RoundingMode.HALF_UP);
+                    .divide(new BigDecimal(reviews.size()), 0, RoundingMode.DOWN);
             Product updateProduct = new Product();
             updateProduct.setId(order.getProductId());
             updateProduct.setRating(avgRating);

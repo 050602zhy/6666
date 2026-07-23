@@ -24,7 +24,7 @@
               />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="handleRecommend">
+              <el-button type="primary" @click="handleRecommend" :loading="loading">
                 <el-icon><Search /></el-icon>
                 获取推荐
               </el-button>
@@ -35,7 +35,10 @@
 
       <!-- 推荐结果 -->
       <div v-if="recommendList.length > 0" class="result-section">
-        <div class="result-title">为您推荐以下商品</div>
+        <div class="result-title">
+          为您推荐以下商品
+          <span class="result-count">共 {{ recommendList.length }} 件</span>
+        </div>
         <div class="recommend-grid">
           <el-card
             v-for="item in recommendList"
@@ -43,21 +46,48 @@
             shadow="hover"
             class="recommend-card"
           >
-            <div class="card-header">
-              <span class="product-name">{{ item.productName }}</span>
-              <el-tag :type="getMatchType(item.matchDegree)" size="small">
-                {{ item.matchDegree }}% 匹配
+            <!-- 商品图片 -->
+            <div class="product-image-wrap">
+              <img v-if="item.image" :src="item.image" :alt="item.name" class="product-image" />
+              <div v-else class="product-image-placeholder">
+                <el-icon :size="48"><Picture /></el-icon>
+              </div>
+              <!-- 匹配度标签 -->
+              <el-tag :type="getMatchType(item.matchScore)" size="small" class="match-tag">
+                {{ item.matchScore }}% 匹配
               </el-tag>
             </div>
-            <div class="card-body">
-              <div class="reason-label">推荐理由：</div>
-              <div class="reason-text">{{ item.reason }}</div>
-            </div>
-            <div class="card-footer">
+
+            <!-- 商品信息 -->
+            <div class="product-info">
+              <div class="product-name" :title="item.name">{{ item.name }}</div>
+
+              <!-- 评分 -->
+              <div class="product-rating">
+                <el-rate :model-value="item.rating" disabled :max="5" show-score text-color="#ff9900" />
+              </div>
+
+              <!-- 价格 -->
+              <div class="product-price">
+                <span v-if="item.discountPrice" class="discount-price">
+                  ¥{{ item.discountPrice }}
+                </span>
+                <span :class="{ 'original-price': item.discountPrice }">
+                  ¥{{ item.price }}
+                </span>
+              </div>
+
+              <!-- 推荐理由 -->
+              <div class="reason-row">
+                <el-icon><Star /></el-icon>
+                <span class="reason-text">{{ item.reason }}</span>
+              </div>
+
+              <!-- 匹配度进度条 -->
               <el-progress
-                :percentage="item.matchDegree"
-                :color="getMatchColor(item.matchDegree)"
-                :stroke-width="8"
+                :percentage="item.matchScore"
+                :color="getMatchColor(item.matchScore)"
+                :stroke-width="6"
                 :show-text="false"
               />
             </div>
@@ -66,8 +96,19 @@
       </div>
 
       <!-- 空状态 -->
-      <div v-else class="empty-state">
+      <div v-else-if="!loading && !searched" class="empty-state">
         <el-empty description="请输入用户ID获取个性化推荐" />
+      </div>
+
+      <!-- 无结果状态 -->
+      <div v-else-if="!loading && searched && recommendList.length === 0" class="empty-state">
+        <el-empty description="暂无推荐商品" />
+      </div>
+
+      <!-- 加载中 -->
+      <div v-if="loading" class="loading-state">
+        <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+        <div class="loading-text">正在为您智能推荐...</div>
       </div>
     </div>
   </div>
@@ -75,52 +116,51 @@
 
 <script setup>
 import { ref } from 'vue'
-import { ArrowLeft, Search } from '@element-plus/icons-vue'
+import { ArrowLeft, Search, Picture, Star, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { getRecommend } from '@/api/recommend'
 
 const userId = ref('')
 const recommendList = ref([])
+const loading = ref(false)
+const searched = ref(false)
 
-function getMatchType(degree) {
-  if (degree >= 80) return 'success'
-  if (degree >= 60) return 'primary'
-  if (degree >= 40) return 'warning'
+function getMatchType(score) {
+  if (score >= 80) return 'success'
+  if (score >= 60) return 'primary'
+  if (score >= 40) return 'warning'
   return 'info'
 }
 
-function getMatchColor(degree) {
-  if (degree >= 80) return '#67c23a'
-  if (degree >= 60) return '#409eff'
-  if (degree >= 40) return '#e6a23c'
+function getMatchColor(score) {
+  if (score >= 80) return '#67c23a'
+  if (score >= 60) return '#409eff'
+  if (score >= 40) return '#e6a23c'
   return '#909399'
 }
 
-function handleRecommend() {
+async function handleRecommend() {
   if (!userId.value.trim()) {
     ElMessage.warning('请输入用户ID')
     return
   }
-  // Mock 推荐数据
-  recommendList.value = [
-    {
-      id: 1,
-      productName: '高端蓝牙降噪耳机 Pro',
-      reason: '基于您近期浏览的音频设备记录，以及同类型用户的购买偏好分析，该商品与您的兴趣高度匹配。',
-      matchDegree: 92
-    },
-    {
-      id: 2,
-      productName: '智能手表 Ultra 运动版',
-      reason: '您的历史订单中包含运动配件类商品，结合您的消费能力评估，推荐此款智能手表。',
-      matchDegree: 78
-    },
-    {
-      id: 3,
-      productName: '4K超清投影仪',
-      reason: '根据您浏览的电子产品品类，以及平台上与您画像相似用户的购买行为，为您推荐此款投影仪。',
-      matchDegree: 65
+
+  loading.value = true
+  searched.value = true
+  recommendList.value = []
+
+  try {
+    const res = await getRecommend(userId.value)
+    if (res.code === 200 && res.data) {
+      recommendList.value = res.data
+    } else {
+      ElMessage.error(res.message || '获取推荐失败')
     }
-  ]
+  } catch (e) {
+    console.error('获取推荐失败:', e)
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -189,55 +229,129 @@ function handleRecommend() {
   font-weight: 600;
   color: #303133;
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.result-count {
+  font-size: 13px;
+  font-weight: normal;
+  color: #909399;
 }
 
 .recommend-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
 }
 
 .recommend-card {
   border-radius: 8px;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, transform 0.2s;
+  overflow: hidden;
+  padding: 0;
 }
 
 .recommend-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
-.card-header {
+:deep(.recommend-card .el-card__body) {
+  padding: 0;
+}
+
+/* 商品图片 */
+.product-image-wrap {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+  background: #f5f7fa;
+}
+
+.product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-image-placeholder {
+  width: 100%;
+  height: 100%;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  justify-content: center;
+  color: #c0c4cc;
+  background: #f5f7fa;
+}
+
+.match-tag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-weight: 500;
+}
+
+/* 商品信息 */
+.product-info {
+  padding: 14px 16px 16px;
 }
 
 .product-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.product-rating {
+  margin-bottom: 8px;
+}
+
+.product-price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.discount-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f56c6c;
+}
+
+.original-price {
+  font-size: 13px;
+  color: #909399;
+  text-decoration: line-through;
+}
+
+.product-price span:not(.discount-price):not(.original-price) {
+  font-size: 18px;
+  font-weight: 700;
   color: #303133;
 }
 
-.card-body {
-  margin-bottom: 16px;
-}
-
-.reason-label {
+.reason-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: #e6a23c;
   font-size: 13px;
-  color: #909399;
-  margin-bottom: 4px;
 }
 
 .reason-text {
-  font-size: 14px;
   color: #606266;
-  line-height: 1.6;
-}
-
-.card-footer {
-  padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 空状态 */
@@ -246,5 +360,29 @@ function handleRecommend() {
   justify-content: center;
   align-items: center;
   height: 300px;
+}
+
+/* 加载中 */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 12px;
+  color: #909399;
+}
+
+.loading-state .el-icon {
+  animation: rotating 1.5s linear infinite;
+}
+
+@keyframes rotating {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  font-size: 14px;
 }
 </style>
